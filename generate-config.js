@@ -104,6 +104,7 @@ function generateLocations(apps, env) {
   const sortedApps = [...apps].sort((a, b) => a.priority - b.priority);
 
   const locations = [];
+  const pathRewrite = env.ENABLE_PATH_REWRITE === 'true';
 
   sortedApps.forEach(app => {
     const upstreamName = app.name.toLowerCase().replace(/_/g, '_');
@@ -113,13 +114,12 @@ function generateLocations(apps, env) {
         const cleanRoute = route.startsWith('/') ? route : `/${route}`;
         // Only use exact match for root path '/'
         const isExact = cleanRoute === '/';
-        // For other paths, we want prefix matching (will match /path and /path/*)
-        const locationPath = isExact ? cleanRoute : cleanRoute;
-        const locationModifier = isExact ? '= ' : '';
-
-        locations.push(`
+        
+        if (isExact) {
+          // Root path - exact match, no rewrite
+          locations.push(`
         # ${app.name} - ${cleanRoute}
-        location ${locationModifier}${locationPath} {
+        location = ${cleanRoute} {
             proxy_pass http://${upstreamName};
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
@@ -131,6 +131,57 @@ function generateLocations(apps, env) {
             proxy_read_timeout 120s;
             proxy_send_timeout 120s;
         }`);
+        } else {
+          // Subpath - dengan trailing slash untuk proper matching
+          const routeWithSlash = cleanRoute.endsWith('/') ? cleanRoute : `${cleanRoute}/`;
+          
+          if (pathRewrite) {
+            // Path rewrite mode: strip base path dan rewrite redirect
+            locations.push(`
+        # ${app.name} - ${cleanRoute}
+        location ${routeWithSlash} {
+            # Strip base path (${cleanRoute})
+            rewrite ^${cleanRoute}(/|$)(.*) /$2 break;
+            
+            proxy_pass http://${upstreamName};
+            
+            # Rewrite Location header untuk redirect
+            proxy_redirect ~^(https?://[^/]+)(/.*)?$ $1${cleanRoute}$2;
+            proxy_redirect / ${cleanRoute}/;
+            
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # Headers untuk backend tahu base path
+            proxy_set_header X-Forwarded-Prefix ${cleanRoute};
+            proxy_set_header X-Script-Name ${cleanRoute};
+            
+            proxy_buffers 16 512k;
+            proxy_buffer_size 512k;
+            proxy_busy_buffers_size 512k;
+            proxy_read_timeout 120s;
+            proxy_send_timeout 120s;
+        }`);
+          } else {
+            // No path rewrite - forward as-is (backend must handle subpath)
+            locations.push(`
+        # ${app.name} - ${cleanRoute}
+        location ${routeWithSlash} {
+            proxy_pass http://${upstreamName};
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_buffers 16 512k;
+            proxy_buffer_size 512k;
+            proxy_busy_buffers_size 512k;
+            proxy_read_timeout 120s;
+            proxy_send_timeout 120s;
+        }`);
+          }
+        }
       });
     }
   });
@@ -230,6 +281,8 @@ function main() {
     process.exit(1);
   }
 
+  const pathRewriteEnabled = env.ENABLE_PATH_REWRITE === 'true';
+  
   console.log('📦 Aplikasi yang ditemukan:');
   apps.forEach(app => {
     console.log(`   • ${app.name}`);
@@ -237,6 +290,8 @@ function main() {
     console.log(`     Routes: ${app.routes.length > 0 ? app.routes.join(', ') : 'default (catch-all)'}`);
     console.log(`     Priority: ${app.priority}`);
   });
+  
+  console.log(`\n🔧 Path Rewrite: ${pathRewriteEnabled ? '✅ ENABLED (akan strip base path & fix redirects)' : '❌ DISABLED (backend harus handle full path)'}`);
 
   const nginxConfig = generateNginxConfig(apps, env);
   const outputPath = path.join(__dirname, 'nginx.conf');

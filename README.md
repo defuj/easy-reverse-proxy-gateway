@@ -176,6 +176,30 @@ WORKER_PROCESSES=auto      # Nginx worker processes
 WORKER_CONNECTIONS=1024    # Max connections per worker
 ```
 
+### 🔄 Path Rewrite Configuration (NEW!)
+
+```bash
+ENABLE_PATH_REWRITE=true   # Auto-fix redirects dan strip base path
+```
+
+**Kapan perlu enable:**
+- ✅ Service running di root (/) tapi diakses via subpath (/app1, /app2)
+- ✅ Service melakukan redirect yang perlu di-fix (misal: redirect `/auth/login` jadi `/app1/auth/login`)
+- ✅ Legacy apps atau third-party tools yang tidak support base path
+
+**Contoh:**
+```bash
+ENABLE_PATH_REWRITE=true
+
+# Portainer running di / tapi diakses via /portainer
+PORTAINER_HOST=192.168.1.100:9000
+PORTAINER_ROUTES=/portainer
+```
+
+Result: Redirect otomatis ter-fix! `/auth/login` → `/portainer/auth/login` ✨
+
+**Baca lengkap:** [PATH-REWRITE-FEATURE.md](PATH-REWRITE-FEATURE.md)
+
 ## ⚙️ Konfigurasi IP Service
 
 Setiap service harus bisa diakses dari device gateway. Pastikan:
@@ -268,13 +292,21 @@ Lihat [TROUBLESHOOTING.md](TROUBLESHOOTING.md) untuk:
 - Port conflicts
 - Network issues
 
-**Service return 404?**
+**Service return 404 atau redirect tidak benar?**
 
 Lihat [README-PATH-REWRITE.md](README-PATH-REWRITE.md) untuk:
-- Path rewriting
+- Path rewriting manual
 - Base path configuration
 - Subdomain routing
 - Multiple SPAs setup
+
+**NEW! Auto Path Rewrite & Redirect Fix**
+
+Lihat [PATH-REWRITE-FEATURE.md](PATH-REWRITE-FEATURE.md) untuk:
+- ✨ Automatic path rewriting
+- ✨ Automatic redirect fixing
+- ✨ Enable dengan 1 setting: `ENABLE_PATH_REWRITE=true`
+- No manual nginx editing needed!
 
 ## 📝 Notes
 

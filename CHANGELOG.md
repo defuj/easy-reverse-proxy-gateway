@@ -1,5 +1,45 @@
 # Changelog
 
+## [2.1.0] - 2025-12-04
+
+### ✨ NEW FEATURE - Auto Path Rewrite & Redirect Fixing
+
+#### Added
+- 🎉 **ENABLE_PATH_REWRITE** - Auto path rewriting dan redirect fixing!
+  - Otomatis strip base path dari request
+  - Otomatis rewrite Location header untuk redirect
+  - Inject X-Forwarded-Prefix & X-Script-Name headers
+  - Solusi untuk masalah: redirect `/auth/login` jadi `/portainer/auth/login`
+
+#### Documentation
+- 📚 **PATH-REWRITE-FEATURE.md** - Dokumentasi lengkap fitur path rewrite
+- 🔧 **TROUBLESHOOTING.md** - Enhanced dengan path rewrite troubleshooting
+- 📖 **README.md** - Updated dengan path rewrite configuration
+
+#### Changes
+- 🔄 **generate-config.js** - Enhanced dengan path rewrite logic
+- ⚙️ **docker-compose.yml** - Support dynamic NGINX_PORT dari .env
+
+#### Fixed
+- ✅ Redirect dari subpath sekarang otomatis ter-fix
+- ✅ Service di root bisa diakses via subpath tanpa 404
+- ✅ Trailing slash handling improved
+
+### Migration to v2.1.0
+
+Tambahkan ke `.env`:
+```bash
+ENABLE_PATH_REWRITE=true  # Untuk auto path rewrite
+```
+
+Regenerate config:
+```bash
+npm run generate
+npm restart
+```
+
+---
+
 ## [2.0.0] - 2025-12-04
 
 ### ✨ Major Update - Auto-Generate Config

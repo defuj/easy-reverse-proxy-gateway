@@ -256,10 +256,31 @@ npm run generate
 cat nginx.conf
 ```
 
+## 🆘 Troubleshooting
+
+**Gateway tidak bisa diakses?**
+
+Lihat [TROUBLESHOOTING.md](TROUBLESHOOTING.md) untuk:
+- Connection reset / Can't be reached
+- 502 Bad Gateway
+- 504 Gateway Timeout
+- Services di localhost
+- Port conflicts
+- Network issues
+
+**Service return 404?**
+
+Lihat [README-PATH-REWRITE.md](README-PATH-REWRITE.md) untuk:
+- Path rewriting
+- Base path configuration
+- Subdomain routing
+- Multiple SPAs setup
+
 ## 📝 Notes
 
-- Gateway berjalan di port 80 (HTTP) by default
+- Gateway berjalan di port 80 (HTTP) by default (bisa diganti via NGINX_PORT di .env)
 - Logs tersimpan di folder `./logs`
 - Konfigurasi bisa di-reload tanpa downtime
 - Mendukung multiple device dengan IP berbeda
 - **nginx.conf di-generate otomatis, jangan edit manual!**
+- Path di ROUTES harus di-handle oleh service (atau perlu manual rewrite)

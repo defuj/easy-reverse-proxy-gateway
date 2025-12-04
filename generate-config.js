@@ -111,11 +111,15 @@ function generateLocations(apps, env) {
     if (app.routes.length > 0) {
       app.routes.forEach(route => {
         const cleanRoute = route.startsWith('/') ? route : `/${route}`;
-        const isExact = cleanRoute === '/' || cleanRoute.endsWith('/*') === false;
+        // Only use exact match for root path '/'
+        const isExact = cleanRoute === '/';
+        // For other paths, we want prefix matching (will match /path and /path/*)
+        const locationPath = isExact ? cleanRoute : cleanRoute;
+        const locationModifier = isExact ? '= ' : '';
 
         locations.push(`
         # ${app.name} - ${cleanRoute}
-        location ${isExact ? '= ' : ''}${cleanRoute} {
+        location ${locationModifier}${locationPath} {
             proxy_pass http://${upstreamName};
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;

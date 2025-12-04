@@ -42,10 +42,29 @@ function extractAppConfigs(env) {
           name: appName,
           host: host,
           routes: [],
-          priority: 999
+          priority: 999,
+          protocol: 'http' // default
         };
       } else {
         apps[appName].host = host;
+      }
+    }
+
+    const protocolMatch = key.match(/^(.+)_PROTOCOL$/);
+    if (protocolMatch) {
+      const appName = protocolMatch[1];
+      const protocol = env[key].toLowerCase();
+
+      if (!apps[appName]) {
+        apps[appName] = {
+          name: appName,
+          host: '',
+          routes: [],
+          priority: 999,
+          protocol: protocol
+        };
+      } else {
+        apps[appName].protocol = protocol;
       }
     }
 
@@ -84,16 +103,71 @@ function extractAppConfigs(env) {
     }
   });
 
-  return Object.values(apps).filter(app => app.host);
+  // Auto-detect protocol for apps that don't have explicit protocol
+  const result = Object.values(apps).filter(app => app.host);
+  result.forEach(app => {
+    if (!app.protocol || app.protocol === 'http') {
+      app.protocol = detectProtocol(app.host, null);
+    }
+  });
+  
+  return result;
+}
+
+// Fungsi untuk detect apakah host adalah external domain (bukan IP:PORT)
+function isExternalDomain(host) {
+  // Check if host is domain (not IP:PORT format)
+  // Examples: facebook.com, api.github.com
+  const ipPortPattern = /^\d+\.\d+\.\d+\.\d+/;
+  const localhostPattern = /^(localhost|127\.0\.0\.1|host\.docker\.internal)/;
+  
+  if (ipPortPattern.test(host) || localhostPattern.test(host)) {
+    return false;
+  }
+  
+  // If looks like domain, it's external
+  return true;
+}
+
+// Fungsi untuk auto-detect protocol dari host
+function detectProtocol(host, explicitProtocol) {
+  if (explicitProtocol) {
+    return explicitProtocol.toLowerCase();
+  }
+  
+  // Check if port is specified
+  if (host.includes(':')) {
+    const port = host.split(':')[1];
+    if (port === '443') return 'https';
+    if (port === '80') return 'http';
+  }
+  
+  // Auto-detect based on domain type
+  if (isExternalDomain(host)) {
+    // External domains default to HTTPS
+    return 'https';
+  }
+  
+  // Internal (IP) default to HTTP
+  return 'http';
 }
 
 // Fungsi untuk generate upstream blocks
 function generateUpstreams(apps) {
   return apps.map(app => {
     const upstreamName = app.name.toLowerCase().replace(/_/g, '_');
-    return `    # ${app.name}
+    const isExternal = isExternalDomain(app.host);
+    const protocol = detectProtocol(app.host, app.protocol);
+    
+    // Add port if not specified
+    let serverHost = app.host;
+    if (!app.host.includes(':')) {
+      serverHost = `${app.host}:${protocol === 'https' ? 443 : 80}`;
+    }
+    
+    return `    # ${app.name} (${protocol.toUpperCase()})
     upstream ${upstreamName} {
-        server ${app.host};
+        server ${serverHost};
     }`;
   }).join('\n\n');
 }
@@ -135,21 +209,37 @@ function generateLocations(apps, env) {
           // Subpath - dengan trailing slash untuk proper matching
           const routeWithSlash = cleanRoute.endsWith('/') ? cleanRoute : `${cleanRoute}/`;
           
+          // Detect protocol
+          const isExternal = isExternalDomain(app.host);
+          const protocol = detectProtocol(app.host, app.protocol);
+          const proxyPassUrl = `${protocol}://${upstreamName}`;
+          
+          // Additional SSL settings for HTTPS
+          const sslSettings = protocol === 'https' ? `
+            # SSL/TLS settings for HTTPS upstream
+            proxy_ssl_server_name on;
+            proxy_ssl_protocols TLSv1.2 TLSv1.3;
+            proxy_ssl_verify off;  # Disable for external services
+            ` : '';
+          
+          // For external domains, preserve original Host header
+          const hostHeader = isExternal ? app.host.split(':')[0] : '$host';
+          
           if (pathRewrite) {
             // Path rewrite mode: strip base path dan rewrite redirect
             locations.push(`
-        # ${app.name} - ${cleanRoute}
+        # ${app.name} - ${cleanRoute} (${protocol.toUpperCase()})
         location ${routeWithSlash} {
             # Strip base path (${cleanRoute})
             rewrite ^${cleanRoute}(/|$)(.*) /$2 break;
             
-            proxy_pass http://${upstreamName};
+            proxy_pass ${proxyPassUrl};${sslSettings}
             
             # Rewrite Location header untuk redirect
             proxy_redirect ~^(https?://[^/]+)(/.*)?$ $1${cleanRoute}$2;
             proxy_redirect / ${cleanRoute}/;
             
-            proxy_set_header Host $host;
+            proxy_set_header Host ${hostHeader};
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
@@ -167,10 +257,11 @@ function generateLocations(apps, env) {
           } else {
             // No path rewrite - forward as-is (backend must handle subpath)
             locations.push(`
-        # ${app.name} - ${cleanRoute}
+        # ${app.name} - ${cleanRoute} (${protocol.toUpperCase()})
         location ${routeWithSlash} {
-            proxy_pass http://${upstreamName};
-            proxy_set_header Host $host;
+            proxy_pass ${proxyPassUrl};${sslSettings}
+            
+            proxy_set_header Host ${hostHeader};
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
@@ -191,11 +282,24 @@ function generateLocations(apps, env) {
   
   if (defaultApp) {
     const upstreamName = defaultApp.name.toLowerCase().replace(/_/g, '_');
+    const isExternal = isExternalDomain(defaultApp.host);
+    const protocol = detectProtocol(defaultApp.host, defaultApp.protocol);
+    const proxyPassUrl = `${protocol}://${upstreamName}`;
+    const hostHeader = isExternal ? defaultApp.host.split(':')[0] : '$host';
+    
+    const sslSettings = protocol === 'https' ? `
+            # SSL/TLS settings for HTTPS upstream
+            proxy_ssl_server_name on;
+            proxy_ssl_protocols TLSv1.2 TLSv1.3;
+            proxy_ssl_verify off;
+            ` : '';
+    
     locations.push(`
-        # Default catch-all (${defaultApp.name})
+        # Default catch-all (${defaultApp.name}) (${protocol.toUpperCase()})
         location / {
-            proxy_pass http://${upstreamName};
-            proxy_set_header Host $host;
+            proxy_pass ${proxyPassUrl};${sslSettings}
+            
+            proxy_set_header Host ${hostHeader};
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
@@ -285,8 +389,11 @@ function main() {
   
   console.log('📦 Aplikasi yang ditemukan:');
   apps.forEach(app => {
+    const isExternal = isExternalDomain(app.host);
+    const protocol = detectProtocol(app.host, app.protocol).toUpperCase();
     console.log(`   • ${app.name}`);
     console.log(`     Host: ${app.host}`);
+    console.log(`     Protocol: ${protocol}${isExternal ? ' (external)' : ' (internal)'}`);
     console.log(`     Routes: ${app.routes.length > 0 ? app.routes.join(', ') : 'default (catch-all)'}`);
     console.log(`     Priority: ${app.priority}`);
   });

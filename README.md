@@ -176,7 +176,7 @@ WORKER_PROCESSES=auto      # Nginx worker processes
 WORKER_CONNECTIONS=1024    # Max connections per worker
 ```
 
-### 🔄 Path Rewrite Configuration (NEW!)
+### 🔄 Path Rewrite Configuration
 
 ```bash
 ENABLE_PATH_REWRITE=true   # Auto-fix redirects dan strip base path
@@ -199,6 +199,32 @@ PORTAINER_ROUTES=/portainer
 Result: Redirect otomatis ter-fix! `/auth/login` → `/portainer/auth/login` ✨
 
 **Baca lengkap:** [PATH-REWRITE-FEATURE.md](PATH-REWRITE-FEATURE.md)
+
+### 🌐 External HTTPS Services (NEW!)
+
+Gateway **otomatis detect** dan support HTTPS untuk external services!
+
+```bash
+# Auto-detect HTTPS untuk domain external
+FACEBOOK_HOST=facebook.com
+FACEBOOK_ROUTES=/facebook
+
+# Auto-detect HTTP untuk IP internal
+API_HOST=192.168.1.100:8080
+API_ROUTES=/api
+```
+
+**Auto-Detection:**
+- ✅ External domains (facebook.com, api.github.com) → HTTPS
+- ✅ Internal IPs (192.168.x.x:port) → HTTP
+- ✅ Manual override: `SERVICE_PROTOCOL=https` atau `=http`
+
+**Generated Config:**
+- SSL/TLS settings otomatis
+- SNI support
+- Host header preservation
+
+**Baca lengkap:** [EXTERNAL-HTTPS-SERVICES.md](EXTERNAL-HTTPS-SERVICES.md)
 
 ## ⚙️ Konfigurasi IP Service
 
@@ -307,6 +333,14 @@ Lihat [PATH-REWRITE-FEATURE.md](PATH-REWRITE-FEATURE.md) untuk:
 - ✨ Automatic redirect fixing
 - ✨ Enable dengan 1 setting: `ENABLE_PATH_REWRITE=true`
 - No manual nginx editing needed!
+
+**NEW! External HTTPS Services**
+
+Lihat [EXTERNAL-HTTPS-SERVICES.md](EXTERNAL-HTTPS-SERVICES.md) untuk:
+- 🌐 Proxy ke external HTTPS services (Facebook, GitHub API, etc.)
+- 🔒 Auto SSL/TLS configuration
+- 🎯 Auto protocol detection (HTTP vs HTTPS)
+- Works out of the box!
 
 ## 📝 Notes
 

@@ -1,5 +1,42 @@
 # Changelog
 
+## [2.2.0] - 2025-12-04
+
+### ✨ NEW FEATURE - External HTTPS Services Support
+
+#### Added
+- 🌐 **Auto HTTPS Detection** - Otomatis detect protocol untuk external domains
+  - External domains (facebook.com, api.github.com) → HTTPS
+  - Internal IPs (192.168.x.x) → HTTP
+  - Manual override via PROTOCOL setting
+- 🔒 **SSL/TLS Configuration** - Auto-generate SSL settings untuk HTTPS upstream
+  - SNI support (`proxy_ssl_server_name on`)
+  - Modern TLS (TLSv1.2, TLSv1.3)
+  - Skip verification untuk flexibility
+- 🎯 **Host Header Preservation** - Preserve original hostname untuk external services
+
+#### Documentation
+- 📚 **EXTERNAL-HTTPS-SERVICES.md** - Dokumentasi lengkap HTTPS external services
+- 📖 **README.md** - Updated dengan HTTPS support info
+
+#### Changes
+- 🔄 **generate-config.js** - Enhanced protocol detection & SSL config generation
+- ⚙️ **Auto-detect** - Smart detection based on IP vs domain
+
+#### Examples
+```bash
+# Auto-detect HTTPS for external domain
+FACEBOOK_HOST=facebook.com
+FACEBOOK_ROUTES=/facebook
+# → Generated with HTTPS + SSL settings ✅
+
+# Manual override
+API_HOST=192.168.1.100:8443
+API_PROTOCOL=https
+```
+
+---
+
 ## [2.1.0] - 2025-12-04
 
 ### ✨ NEW FEATURE - Auto Path Rewrite & Redirect Fixing

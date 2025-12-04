@@ -1,7 +1,7 @@
 {
   "name": "reverse-proxy-tool",
-  "version": "2.1.0",
-  "description": "Nginx reverse proxy gateway untuk multiple services dengan auto path rewrite & redirect fix",
+  "version": "2.2.0",
+  "description": "Nginx reverse proxy gateway untuk multiple services dengan auto path rewrite, redirect fix & HTTPS external services support",
   "scripts": {
     "generate": "node generate-config.js",
     "check": "node validate-env.js",
